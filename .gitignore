@@ -15,6 +15,7 @@ dist-ssr
 
 # Secrets and Keys
 serviceAccountKey.json
+serviceAccountKey1.json
 .env
 .env.*
 
