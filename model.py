@@ -13,8 +13,9 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.model_selection import train_test_split
+from scipy.stats import chi2_contingency
 import uvicorn
 
 # Initialize FastAPI
@@ -168,6 +169,60 @@ def classify_students(df):
 
     print("\n--- Decision Tree Report ---")
     print(classification_report(y_test, y_pred_dt))
+    
+    # --- Significance Testing (Random Forest vs Heuristic) ---
+    print("\n--- Significance Testing (RF vs Rule-Based Heuristic) ---")
+    
+    # 1. Define Heuristic: If retention_rate < 60 (calculated from acc & streak), then At Risk.
+    #    Strictly based, if we didn't have retention_rate computed, we'd approximate.
+    #    Here we simulate a 'Simple Rule' based only on Total Accuracy < 60 for contrast.
+    y_pred_heuristic = X_test['total_accuracy'] < 60
+    
+    acc_rf = accuracy_score(y_test, y_pred_rf)
+    acc_heuristic = accuracy_score(y_test, y_pred_heuristic)
+    
+    print(f"Random Forest Accuracy: {acc_rf:.4f}")
+    print(f"Heuristic Accuracy:     {acc_heuristic:.4f}")
+    
+    # 2. McNemar's Test Contingency Table
+    # Table layout:
+    #                 Heuristic Correct    Heuristic Wrong
+    # RF Correct          a (Yes/Yes)         b (Yes/No)
+    # RF Wrong            c (No/Yes)          d (No/No)
+    
+    rf_correct = (y_pred_rf == y_test)
+    heuristic_correct = (y_pred_heuristic == y_test)
+    
+    a = np.sum(rf_correct & heuristic_correct)
+    b = np.sum(rf_correct & ~heuristic_correct)
+    c = np.sum(~rf_correct & heuristic_correct)
+    d = np.sum(~rf_correct & ~heuristic_correct)
+    
+    contingency_table = np.array([[a, b], [c, d]])
+    print("\nContingency Table (McNemar's):")
+    print(contingency_table)
+    
+    # 3. Calculate McNemar's Statistic
+    # We use chi2_contingency for independence, but for McNemar's specifically:
+    # statistic = (b - c)^2 / (b + c)
+    # We can use the mcnemar test from statsmodels if available, but manual calculation is robust here.
+    
+    if (b + c) > 0:
+        mcnemar_stat = (abs(b - c) - 1)**2 / (b + c) # with continuity correction
+        # P-value from chi-square distribution with 1 degree of freedom
+        from scipy.stats import chi2
+        p_value = 1 - chi2.cdf(mcnemar_stat, 1)
+        
+        print(f"McNemar's Statistic (chi-squared): {mcnemar_stat:.4f}")
+        print(f"P-value: {p_value:.4f}")
+        
+        if p_value < 0.05:
+            print(">> Result: Statistically Significant Difference (p < 0.05)")
+        else:
+            print(">> Result: No Statistically Significant Difference")
+    else:
+        print(">> Result: Identical predictions (b+c=0), cannot compute McNemar's.")
+
     
     # Prediction for the application (predict on full dataset) - Using Random Forest as primary
     df['is_at_risk'] = rf.predict(X_ml)
