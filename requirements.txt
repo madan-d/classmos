@@ -7,3 +7,5 @@ fastapi
 uvicorn
 pydantic
 firebase-admin
+google-genai
+python-dotenv

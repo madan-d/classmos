@@ -1,9 +1,11 @@
 import os
 import random
+from google import genai
+from google.genai import types
+from dotenv import load_dotenv
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import firebase_admin
@@ -18,17 +20,7 @@ from sklearn.model_selection import train_test_split
 from scipy.stats import chi2_contingency
 import uvicorn
 
-# Initialize FastAPI
-app = FastAPI()
-
-# CORS for frontend connection
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+router = APIRouter()
 
 # --- Firebase Setup ---
 # Check for service account key
@@ -229,7 +221,7 @@ def classify_students(df):
     
     return df, "success"
 
-@app.get("/analytics", response_model=AnalyticsResponse)
+@router.get("/analytics", response_model=AnalyticsResponse)
 async def get_analytics():
     df_students = pd.DataFrame()
     
@@ -289,6 +281,3 @@ async def get_analytics():
         })
         
     return {"students": result, "status": "success"}
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
